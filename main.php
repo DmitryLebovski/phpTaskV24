@@ -1,6 +1,30 @@
 <?php
 include 'db.php';
 
+// Функция для выполнения запроса на получение изделий мастера
+function getProductsByMaster($pdo, $masterSurname)
+{
+    try {
+        $stmt = $pdo->prepare('SELECT t.name AS product_type, p.weight, p.sample, p.cost 
+                               FROM product p
+                               LEFT JOIN master m ON p.master_id = m.id
+                               LEFT JOIN product_type t ON p.type_id = t.id
+                               WHERE m.surname = :surname');
+        $stmt->execute(['surname' => $masterSurname]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        die("Ошибка выполнения запроса: " . $e->getMessage());
+    }
+}
+
+// Получение списка фамилий мастеров
+try {
+    $stmt_master_surnames = $pdo->query('SELECT DISTINCT surname FROM master');
+    $master_surnames = $stmt_master_surnames->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {
+    die("Ошибка выполнения запроса: " . $e->getMessage());
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['open_shop'])) {
         try {
@@ -18,6 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                 LEFT JOIN product_type t ON p.type_id = t.id
                                                 GROUP BY t.name');
             $product_counts = $stmt_count_products->fetchAll(PDO::FETCH_ASSOC);
+            $sort_button = "<button class=\"button\" onclick=\"window.location.href='search_sort.php'\">Сортировка и поиск</button>";
         } catch (PDOException $e) {
             die("Ошибка выполнения запроса: " . $e->getMessage());
         }
@@ -58,13 +83,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Запрос на отображение списка изделий
         try {
             $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample, 
-                                to_char(p.date, \'DD Month YYYY г.\') AS formatted_date, 
-                                p.cost, m.surname 
-                            FROM product p
-                            LEFT JOIN master m ON p.master_id = m.id
-                            LEFT JOIN product_type t ON p.type_id = t.id');
+                                            m.surname AS master_surname
+                                    FROM product p
+                                    LEFT JOIN master m ON p.master_id = m.id
+                                    LEFT JOIN product_type t ON p.type_id = t.id
+                                    ORDER BY m.surname ASC, t.name ASC');
 
             $products = $stmt_product->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmt_total_count = $pdo->query('SELECT COUNT(*) AS total_count FROM product');
+            $total_count = $stmt_total_count->fetchColumn();
         } catch (PDOException $e) {
             die("Ошибка выполнения запроса: " . $e->getMessage());
         }
@@ -72,29 +100,57 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Вывод кнопки для добавления изделия и таблицы с изделиями
         $title = "Список изделий:";
-        $headers = array("Вид изделия", "Вес", "Проба", "Дата поступления", "Стоимость", "Фамилия мастера");
+        $headers = array("Вид изделия", "Вес", "Проба", "Фамилия мастера");
         $data = $products;
         $add_button = "<button class=\"button\" onclick=\"window.location.href='add_product.php'\">Добавить изделие</button>";
-        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по стоимости (убыванию)</button></form>";
+        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по пробе (возрастанию)</button></form>";
+        $show_master_products_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"show_master_products\">Показать изделия мастера</button></form>";
     } elseif (isset($_POST['sort_cost'])) {
-            // Выполнить запрос на сортировку по стоимости в порядке убывания
-            try {
-                $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample, 
-                            to_char(p.date, \'DD Month YYYY г.\') AS formatted_date, 
-                            p.cost, m.surname 
+        // Выполнить запрос на сортировку по пробе
+        try {
+            $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample, m.surname 
                         FROM product p
                         LEFT JOIN master m ON p.master_id = m.id
                         LEFT JOIN product_type t ON p.type_id = t.id
-                        ORDER BY p.cost DESC'); // Сортировка по стоимости в порядке убывания
-                $products = $stmt_product->fetchAll(PDO::FETCH_ASSOC);
-            } catch (PDOException $e) {
-                die("Ошибка выполнения запроса: " . $e->getMessage());
-            }
+                        ORDER BY p.sample DESC, t.name DESC'); // Сортировка по пробе
+            $products = $stmt_product->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            die("Ошибка выполнения запроса: " . $e->getMessage());
+        }
         $title = "Список изделий:";
-        $headers = array("Вид изделия", "Вес", "Проба", "Дата поступления", "Стоимость", "Фамилия мастера");
+        $headers = array("Вид изделия", "Вес", "Проба", "Фамилия мастера");
         $data = $products;
         $add_button = "<button class=\"button\" onclick=\"window.location.href='add_product.php'\">Добавить изделие</button>";
         $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по стоимости (убыванию)</button></form>";
+    } elseif (isset($_POST['show_master_products'])) {
+        try {
+            $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample, 
+                                            m.surname AS master_surname
+                                    FROM product p
+                                    LEFT JOIN master m ON p.master_id = m.id
+                                    LEFT JOIN product_type t ON p.type_id = t.id
+                                    ORDER BY m.surname ASC, t.name ASC');
+
+            $products = $stmt_product->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmt_total_count = $pdo->query('SELECT COUNT(*) AS total_count FROM product');
+            $total_count = $stmt_total_count->fetchColumn();
+        } catch (PDOException $e) {
+            die("Ошибка выполнения запроса: " . $e->getMessage());
+        }
+
+        $title = "Список изделий:";
+        $headers = array("Вид изделия", "Вес", "Проба", "Фамилия мастера");
+        $data = $products;
+        $add_button = "<button class=\"button\" onclick=\"window.location.href='add_product.php'\">Добавить изделие</button>";
+        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по пробе (возрастанию)</button></form>";
+
+        if (isset($_POST['master_surname'])) {
+            $selected_master_surname = $_POST['master_surname'];
+            $master_products = getProductsByMaster($pdo, $selected_master_surname);
+        } else {
+            echo "Не выбрана фамилия мастера.";
+        }
     }
 }
 ?>
@@ -155,6 +211,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             overflow: hidden; /* Обрезаем размытый фон */
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Тень */
             background-color: rgba(255, 255, 255, 0.7); /* Цвет и прозрачность фона */
+            padding: 8px;
         }
 
         th, td {
@@ -201,6 +258,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($add_button)): ?>
+            <div class="add-button-container"><?= $add_button ?></div>
+        <?php endif; ?>
+        <?php if (isset($sort_button)): ?>
+            <div class="add-button-container"><?= $sort_button ?></div>
+        <?php endif; ?>
         <table>
             <tr>
                 <?php foreach ($headers as $header): ?>
@@ -215,8 +278,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </tr>
             <?php endforeach; ?>
         </table>
+        <?php if (isset($total_count)) : ?>
+            <div class="total-count">Общее количество изделий в магазине: <?= $total_count ?></div>
+        <?php endif; ?>
+        <?php if (isset($show_master_products_button)): ?>
+            <form method="post">
+                <label for="master_surname">Выберите фамилию мастера:</label>
+                <select name="master_surname" id="master_surname">
+                    <?php foreach ($master_surnames as $surname) : ?>
+                        <option value="<?= $surname ?>"><?= $surname ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button class="button" type="submit" name="show_master_products">Показать изделия мастера</button>
+            </form>
+        <?php endif; ?>
+        <?php if (isset($master_products)) : ?>
+            <h2>Изделия мастера <?= $selected_master_surname ?></h2>
+            <table>
+                <tr>
+                    <th>Вид изделия</th>
+                    <th>Вес</th>
+                    <th>Проба</th>
+                    <th>Стоимость</th>
+                </tr>
+                <?php foreach ($master_products as $product) : ?>
+                    <tr>
+                        <td><?= $product['product_type'] ?></td>
+                        <td><?= $product['weight'] ?></td>
+                        <td><?= $product['sample'] ?></td>
+                        <td><?= $product['cost'] ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </table>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 </body>
-
 </html>
