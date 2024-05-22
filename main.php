@@ -17,6 +17,25 @@ function getProductsByMaster($pdo, $masterSurname)
     }
 }
 
+function russian_date($date) {
+    $date = strtotime($date);
+    $months = [
+        "January" => "Январь",
+        "February" => "Февраль",
+        "March" => "Март",
+        "April" => "Апрель",
+        "May" => "Май",
+        "June" => "Июнь",
+        "July" => "Июль",
+        "August" => "Август",
+        "September" => "Сентябрь",
+        "October" => "Октябрь",
+        "November" => "Ноябрь",
+        "December" => "Декабрь"
+    ];
+    return date('d', $date) . ' ' . $months[date('F', $date)] . ' ' . date('Y', $date) . 'г.';
+}
+
 // Получение списка фамилий мастеров
 try {
     $stmt_master_surnames = $pdo->query('SELECT DISTINCT surname FROM master');
@@ -29,7 +48,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['open_shop'])) {
         try {
             $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample, 
-                                to_char(p.date, \'DD Month YYYY год\') AS formatted_date, 
+                                p.date, 
                                 p.cost, m.name, m.surname, m.thirdname, m.exp, m.grade 
                             FROM product p
                             LEFT JOIN master m ON p.master_id = m.id
@@ -82,7 +101,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif (isset($_POST['list_products'])) {
         // Запрос на отображение списка изделий
         try {
-            $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample, 
+            $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample,
                                             m.surname AS master_surname
                                     FROM product p
                                     LEFT JOIN master m ON p.master_id = m.id
@@ -103,7 +122,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $headers = array("Вид изделия", "Вес", "Проба", "Фамилия мастера");
         $data = $products;
         $add_button = "<button class=\"button\" onclick=\"window.location.href='add_product.php'\">Добавить изделие</button>";
-        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по пробе (возрастанию)</button></form>";
+        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по пробе (убыванию)</button></form>";
         $show_master_products_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"show_master_products\">Показать изделия мастера</button></form>";
     } elseif (isset($_POST['sort_cost'])) {
         // Выполнить запрос на сортировку по пробе
@@ -121,7 +140,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $headers = array("Вид изделия", "Вес", "Проба", "Фамилия мастера");
         $data = $products;
         $add_button = "<button class=\"button\" onclick=\"window.location.href='add_product.php'\">Добавить изделие</button>";
-        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по стоимости (убыванию)</button></form>";
+        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по пробе (убыванию)</button></form>";
     } elseif (isset($_POST['show_master_products'])) {
         try {
             $stmt_product = $pdo->query('SELECT t.name AS product_type, p.weight, p.sample, 
@@ -143,7 +162,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $headers = array("Вид изделия", "Вес", "Проба", "Фамилия мастера");
         $data = $products;
         $add_button = "<button class=\"button\" onclick=\"window.location.href='add_product.php'\">Добавить изделие</button>";
-        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по пробе (возрастанию)</button></form>";
+        $sort_button = "<form method=\"post\"><button class=\"button\" type=\"submit\" name=\"sort_cost\">Отсортировать по пробе (убыванию)</button></form>";
 
         if (isset($_POST['master_surname'])) {
             $selected_master_surname = $_POST['master_surname'];
@@ -203,14 +222,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         table {
-            width: auto; /* Для динамической ширины */
+            width: auto;
             margin: 0 auto;
             border-collapse: collapse;
-            border: none; /* Убираем границы */
-            border-radius: 10px; /* Загругляем края */
-            overflow: hidden; /* Обрезаем размытый фон */
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Тень */
-            background-color: rgba(255, 255, 255, 0.7); /* Цвет и прозрачность фона */
+            border: none;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            background-color: rgba(255, 255, 255, 0.7);
             padding: 8px;
         }
 
@@ -234,23 +253,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-bottom: 5px;
             color: #555;
         }
+
+        .help-button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .help-button:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 
 <body>
 <div class="toolbar">
-    <h1 style="color: #E2CFC0;">Золотой PHP</h1>
+    <h1 style="color: #E2CFC0;" title="Главная страница системы управления изделиями">Золотой PHP</h1>
     <form method="post">
-        <button class="button" type="submit" name="open_shop">Открыть учёт магазина</button>
-        <button class="button" type="submit" name="list_masters">Список мастеров</button>
-        <button class="button" type="submit" name="list_types">Список видов изделий</button>
-        <button class="button" type="submit" name="list_products">Список изделий</button>
+        <button class="button" type="submit" name="open_shop" title="Открыть и отобразить все данные о текущих изделиях">Открыть учёт магазина</button>
+        <button class="button" type="submit" name="list_masters" title="Отобразить список всех мастеров">Список мастеров</button>
+        <button class="button" type="submit" name="list_types" title="Отобразить список всех видов изделий">Список видов изделий</button>
+        <button class="button" type="submit" name="list_products" title="Отобразить список всех изделий">Список изделий</button>
+        <a href="help.php" class="button help-button" title="Перейти на страницу справки">Справка</a>
     </form>
 </div>
 
 <div class="container">
     <?php if(isset($title) && isset($headers) && isset($data)): ?>
         <h2><?= $title ?></h2>
+
         <?php if (isset($product_counts)): ?>
             <div style="margin-bottom: 10px;">
                 <?php foreach ($product_counts as $product_count): ?>
@@ -258,13 +292,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
+
         <?php if (isset($add_button)): ?>
             <div class="add-button-container"><?= $add_button ?></div>
         <?php endif; ?>
+
         <?php if (isset($sort_button)): ?>
             <div class="add-button-container"><?= $sort_button ?></div>
         <?php endif; ?>
-        <table>
+
+        <table title="Таблица данных">
             <tr>
                 <?php foreach ($headers as $header): ?>
                     <th><?= $header ?></th>
@@ -272,15 +309,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </tr>
             <?php foreach ($data as $row): ?>
                 <tr>
-                    <?php foreach ($row as $cell): ?>
-                        <td><?= $cell ?></td>
+                    <?php foreach ($row as $key => $cell): ?>
+                        <?php if ($key == 'date'): ?>
+                            <td title="Дата поступления изделия"><?= russian_date($cell) ?></td>
+                        <?php else: ?>
+                            <td><?= $cell ?></td>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 </tr>
             <?php endforeach; ?>
         </table>
+
         <?php if (isset($total_count)) : ?>
             <div class="total-count">Общее количество изделий в магазине: <?= $total_count ?></div>
         <?php endif; ?>
+
         <?php if (isset($show_master_products_button)): ?>
             <form method="post">
                 <label for="master_surname">Выберите фамилию мастера:</label>
@@ -292,6 +335,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <button class="button" type="submit" name="show_master_products">Показать изделия мастера</button>
             </form>
         <?php endif; ?>
+
         <?php if (isset($master_products)) : ?>
             <h2>Изделия мастера <?= $selected_master_surname ?></h2>
             <table>
@@ -311,6 +355,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php endforeach; ?>
             </table>
         <?php endif; ?>
+
     <?php endif; ?>
 </div>
 </body>
